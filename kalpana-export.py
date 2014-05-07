@@ -52,7 +52,7 @@ class UserPlugin(GUIPlugin):
             self.error('Export format not recognized')
         else:
             for rx, rep in self.settings['formats'][arg]:
-                text = re.sub(rx, rep, text, flags=re.MULTILINE)
+                text = re.sub(rx, rep, text)
             clipboard = QtGui.QApplication.clipboard()
             clipboard.setText(text.strip('\n\t '))
             self.print_('Text exported to clipboard')
