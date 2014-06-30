@@ -51,8 +51,22 @@ class UserPlugin(GUIPlugin):
         if not arg in self.settings['formats']:
             self.error('Export format not recognized')
         else:
-            for rx, rep in self.settings['formats'][arg]:
-                text = re.sub(rx, rep, text)
+            for x in self.settings['formats'][arg]:
+                if len(x) == 2:
+                    text = re.sub(x[0], x[1], text)
+                elif len(x) == 3:
+                    text = replace_in_selection(x[0], x[1], x[2], text)
             clipboard = QtGui.QApplication.clipboard()
             clipboard.setText(text.strip('\n\t '))
             self.print_('Text exported to clipboard')
+
+def replace_in_selection(rx, rep, selrx, text):
+    chunks = []
+    selections = re.finditer(selrx, text)
+    for sel in selections:
+        x = re.sub(rx, rep, sel.group(0))
+        chunks.append((sel.start(), sel.end(), x))
+    # Do this backwards to avoid messing up the positions of the chunks
+    for start, end, payload in chunks[::-1]:
+        text = text[:start] + payload + text[end:]
+    return text
