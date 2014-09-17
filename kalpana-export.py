@@ -13,15 +13,10 @@ class UserPlugin(GUIPlugin):
         self.pluginpath = get_path()
         self.configpath = objects['settings manager'].get_config_directory()
         self.textarea = objects['textarea']
-        self.chapterplugin = self.get_chapter_plugin(objects['plugins'])
+        self.chaptersidebar = objects['chaptersidebar']
         self.commands = {
             'e': (self.export, 'Export the text to custom format')
         }
-
-    def get_chapter_plugin(self, plugins):
-        for name, p in plugins:
-            if name == 'kalpana-chapters':
-                return p
 
     def read_config(self):
         configfile = os.path.join(self.configpath, 'kalpana-export.conf')
@@ -34,14 +29,11 @@ class UserPlugin(GUIPlugin):
             return
         # Get a specific chapter to export
         if re.match(r'.+?:(\d+)$', arg):
-            if not self.chapterplugin:
-                self.error('Chapter plugin not detected')
-                return
             arg, chapter = arg.rsplit(':',1)
             if not chapter:
                 self.error('No chapter specified')
                 return
-            text = self.chapterplugin.get_chapter_text(int(chapter))
+            text = self.chaptersidebar.get_chapter_text(int(chapter))
             if not text:
                 return
         # Otherwise the whole text
