@@ -11,7 +11,7 @@ class UserPlugin(GUIPlugin):
     def __init__(self, objects, get_path):
         super().__init__(objects, get_path)
         self.pluginpath = get_path()
-        self.configpath = objects['settings manager'].get_config_directory()
+        self.configpath = objects['settingsmanager'].get_config_directory()
         self.textarea = objects['textarea']
         self.chaptersidebar = objects['chaptersidebar']
         self.commands = {
