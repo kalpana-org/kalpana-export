@@ -7,6 +7,9 @@ from libsyntyche.common import read_json, parse_stylesheet, read_file, make_sure
 from pluginlib import GUIPlugin
 
 
+class ExportError(Exception):
+    pass
+
 class UserPlugin(GUIPlugin):
     def __init__(self, objects, get_path):
         super().__init__(objects, get_path)
@@ -24,33 +27,44 @@ class UserPlugin(GUIPlugin):
         self.settings = read_json(configfile)
 
     def export(self, arg):
-        if not arg:
-            self.error('No export format specified')
-            return
-        # Get a specific chapter to export
-        if re.match(r'.+?:(\d+)$', arg):
-            arg, chapter = arg.rsplit(':',1)
-            if not chapter:
-                self.error('No chapter specified')
-                return
-            text = self.chaptersidebar.get_chapter_text(int(chapter))
-            if not text:
-                return
-        # Otherwise the whole text
+        try:
+            success = export_chapter(arg, self.textarea.toPlainText,
+                                    self.chaptersidebar.get_chapter_text,
+                                    self.settings['formats'])
+        except ExportError as e:
+            self.error(str(e))
         else:
-            text = self.textarea.toPlainText()
+            if success:
+                self.print_('Text exported to clipboard')
 
-        if not arg in self.settings['formats']:
-            self.error('Export format not recognized')
-        else:
-            for x in self.settings['formats'][arg]:
-                if len(x) == 2:
-                    text = re.sub(x[0], x[1], text)
-                elif len(x) == 3:
-                    text = replace_in_selection(x[0], x[1], x[2], text)
-            clipboard = QtGui.QApplication.clipboard()
-            clipboard.setText(text.strip('\n\t '))
-            self.print_('Text exported to clipboard')
+
+def export_chapter(arg, get_text, get_chapter_text, formats):
+    if not arg:
+        raise ExportError('No export format specified')
+    # Get a specific chapter to export
+    if re.match(r'.+?:(\d+)$', arg):
+        arg, chapter = arg.rsplit(':',1)
+        if not chapter:
+            raise ExportError('No chapter specified')
+        text = get_chapter_text(int(chapter))
+        if not text:
+            return False
+    # Otherwise the whole text
+    else:
+        text = get_text()
+
+    if not arg in formats:
+        raise ExportError('Export format not recognized')
+    else:
+        for x in formats[arg]:
+            if len(x) == 2:
+                text = re.sub(x[0], x[1], text)
+            elif len(x) == 3:
+                text = replace_in_selection(x[0], x[1], x[2], text)
+        clipboard = QtGui.QApplication.clipboard()
+        clipboard.setText(text.strip('\n\t '))
+        return True
+
 
 def replace_in_selection(rx, rep, selrx, text):
     chunks = []
