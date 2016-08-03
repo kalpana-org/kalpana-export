@@ -1,14 +1,16 @@
 import os.path
 import re
 
-from PyQt4 import QtCore, QtGui
-
 from libsyntyche.common import read_json, parse_stylesheet, read_file, make_sure_config_exists
-from pluginlib import GUIPlugin
-
 
 class ExportError(Exception):
     pass
+
+try:
+    from pluginlib import GUIPlugin
+except ImportError:
+    class GUIPlugin:
+        pass
 
 class UserPlugin(GUIPlugin):
     def __init__(self, objects, get_path):
@@ -28,14 +30,16 @@ class UserPlugin(GUIPlugin):
 
     def export(self, arg):
         try:
-            success = export_chapter(arg, self.textarea.toPlainText,
+            text = export_chapter(arg, self.textarea.toPlainText,
                                     self.chaptersidebar.get_chapter_text,
                                     self.settings['formats'])
         except ExportError as e:
             self.error(str(e))
         else:
-            if success:
-                self.print_('Text exported to clipboard')
+            from PyQt4 import QtGui
+            clipboard = QtGui.QApplication.clipboard()
+            clipboard.setText(text)
+            self.print_('Text exported to clipboard')
 
 
 def export_chapter(arg, get_text, get_chapter_text, formats):
@@ -48,11 +52,13 @@ def export_chapter(arg, get_text, get_chapter_text, formats):
             raise ExportError('No chapter specified')
         text = get_chapter_text(int(chapter))
         if not text:
-            return False
+            raise ExportError('Nothing to export')
     # Otherwise the whole text
     else:
         text = get_text()
-
+    # Get rid of excess blank lines
+    text = re.sub(r'\n(?:[ \t]*\n)+', '\n\n', text)
+    # Format the text
     if not arg in formats:
         raise ExportError('Export format not recognized')
     else:
@@ -61,9 +67,7 @@ def export_chapter(arg, get_text, get_chapter_text, formats):
                 text = re.sub(x[0], x[1], text)
             elif len(x) == 3:
                 text = replace_in_selection(x[0], x[1], x[2], text)
-        clipboard = QtGui.QApplication.clipboard()
-        clipboard.setText(text.strip('\n\t '))
-        return True
+        return text.strip('\n\t ')
 
 
 def replace_in_selection(rx, rep, selrx, text):
