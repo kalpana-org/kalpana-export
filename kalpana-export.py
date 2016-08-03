@@ -1,5 +1,6 @@
 import os.path
 import re
+import webbrowser
 
 from libsyntyche.common import read_json, parse_stylesheet, read_file, make_sure_config_exists
 
@@ -30,29 +31,44 @@ class UserPlugin(GUIPlugin):
 
     def export(self, arg):
         try:
-            text = export_chapter(arg, self.textarea.toPlainText,
+            text, openurls = export_chapter(arg, self.textarea.toPlainText,
                                     self.chaptersidebar.get_chapter_text,
                                     self.settings['formats'])
         except ExportError as e:
             self.error(str(e))
         else:
+            if openurls:
+                for url in openurls:
+                    webbrowser.open_new_tab(url)
             from PyQt4 import QtGui
             clipboard = QtGui.QApplication.clipboard()
             clipboard.setText(text)
             self.print_('Text exported to clipboard')
 
+def get_export_urls(text):
+    rx = r'(?m)^%%\s+export-url\[(?P<label>.+?)\]\s+(?P<url>https?://.+?)\s*$'
+    return [(m.group('label'),m.group('url')) for m in re.finditer(rx, text)]
+
 
 def export_chapter(arg, get_text, get_chapter_text, formats):
     if not arg:
         raise ExportError('No export format specified')
+    openurls = None
     # Get a specific chapter to export
-    if re.match(r'.+?:(\d+)$', arg):
-        arg, chapter = arg.rsplit(':',1)
+    chaptermatch = re.match(r'(?P<label>.+?):(?P<chapter>\d*)(?P<openurl>x?)$', arg)
+    if chaptermatch:
+        arg = chaptermatch.group('label')
+        chapter = chaptermatch.group('chapter')
         if not chapter:
             raise ExportError('No chapter specified')
         text = get_chapter_text(int(chapter))
         if not text:
             raise ExportError('Nothing to export')
+        if chaptermatch.group('openurl') == 'x':
+            urls = get_export_urls(get_text())
+            if arg not in next(zip(*urls)):
+                raise ExportError('Export format url not found')
+            openurls = [url for label, url in urls if label == arg]
     # Otherwise the whole text
     else:
         text = get_text()
@@ -67,7 +83,7 @@ def export_chapter(arg, get_text, get_chapter_text, formats):
                 text = re.sub(x[0], x[1], text)
             elif len(x) == 3:
                 text = replace_in_selection(x[0], x[1], x[2], text)
-        return text.strip('\n\t ')
+        return text.strip('\n\t '), openurls
 
 
 def replace_in_selection(rx, rep, selrx, text):
